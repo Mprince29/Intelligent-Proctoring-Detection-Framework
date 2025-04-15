@@ -1,0 +1,45 @@
+<!-- student_register.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Exam Registration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Student Exam Registration</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <ul class="flash-messages">
+            {% for message in messages %}
+            <li class="flash-message">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <label for="application_number">Application Number:</label>
+            <input type="text" name="application_number" required><br>
+
+            <label for="full_name">Full Name:</label>
+            <input type="text" name="full_name" required><br>
+
+            <label for="email">Email Address:</label>
+            <input type="email" name="email" required><br>
+
+            <label for="phone">Phone Number:</label>
+            <input type="text" name="phone" required><br>
+
+            <label for="photo">Passport Photo:</label>
+            <input type="file" name="photo" accept="image/*" required><br>
+
+            <button type="submit" class="btn btn-success">Register</button>
+        </form>
+
+        <p><a href="/">Back to Home</a></p>
+    </div>
+</body>
+</html>

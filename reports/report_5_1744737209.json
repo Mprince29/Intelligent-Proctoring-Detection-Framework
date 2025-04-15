@@ -1,0 +1,92 @@
+{
+  "student_id": 5,
+  "session_id": "session_5_1744737201",
+  "start_time": "2025-04-15 22:43:21",
+  "end_time": "2025-04-15 22:43:29",
+  "is_verified": true,
+  "max_confidence": 0.5890818690706345,
+  "reading_data": {
+    "continuous_reading_time": 0,
+    "reading_sessions": 0,
+    "total_reading_time": 0,
+    "on_screen_percentage": 0,
+    "tracking_start_time": 1744737202.8030713
+  },
+  "head_data": {
+    "head_direction": "no_face",
+    "head_direction_vector": [
+      0,
+      0,
+      0
+    ],
+    "head_movement_count": 0,
+    "slight_movement_count": 0,
+    "last_movement_time": 1744737202.8030713,
+    "tracking_start_time": 1744737202.8030713,
+    "straight_time_percentage": 0.0,
+    "straight_head_time": 0.0,
+    "last_status_change_time": 1744737202.8030713
+  },
+  "audio_data": {
+    "total_words_detected": 0,
+    "total_sentences": 0,
+    "last_spoken_text": "",
+    "audio_monitoring_active": true,
+    "headphones_detected": false,
+    "headphones_with_mic": false,
+    "background_noise_level": 0,
+    "last_detection_time": null,
+    "most_common_words": [],
+    "total_unique_words": 0,
+    "time_since_last_detection": null,
+    "speech_frequency": 0.0,
+    "energy_threshold": 2.353077448389599e-33
+  },
+  "object_data": {
+    "total_objects_detected": 43,
+    "unique_objects_detected": 3,
+    "most_common_objects": [
+      [
+        "person",
+        39
+      ],
+      [
+        "chair",
+        3
+      ],
+      [
+        "cake",
+        1
+      ]
+    ],
+    "recent_detections": [
+      {
+        "object": "person",
+        "time": "2025-04-15 22:43:08",
+        "seconds_ago": 20
+      },
+      {
+        "object": "person",
+        "time": "2025-04-15 22:43:12",
+        "seconds_ago": 17
+      },
+      {
+        "object": "person",
+        "time": "2025-04-15 22:43:15",
+        "seconds_ago": 14
+      },
+      {
+        "object": "person",
+        "time": "2025-04-15 22:43:18",
+        "seconds_ago": 10
+      },
+      {
+        "object": "chair",
+        "time": "2025-04-15 22:43:21",
+        "seconds_ago": 7
+      }
+    ],
+    "time_since_last_detection": 0.0790410041809082,
+    "last_processed_time": 1744737209.31883
+  }
+}

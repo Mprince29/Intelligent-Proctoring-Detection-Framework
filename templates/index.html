@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cheating Surveillance System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Cheating Surveillance System</h1>
+        <p>This application tracks your  eye movements, head posture, ambient sound, and object presence and verifies your identity.</p>
+               
+        <!-- User selection and verification section -->
+        <div class="user-section">
+            <div id="tab-lock-info" style="color:red; font-weight:bold;">Tab locked for <span id="tab-timer">30</span> seconds...</div>
+            <h2>User Selection</h2>
+            <a id="download-recording-btn" class="btn btn-primary" style="display: none;">Download Recording</a>
+
+            <div class="user-verification-status">
+                {% if current_user.user_id is not none %}
+<div id="verification-status" class="status-indicator not-verified">
+    User #{{ current_user.user_id }}: Not Verified
+</div>
+{% else %}
+<div id="verification-status" class="status-indicator not-verified">
+    No User Selected
+</div>
+{% endif %}
+
+            </div>
+            
+            <div class="users-list">
+                <h3>Registered Users</h3>
+                {% if users %}
+                <ul>
+                    {% for user in users %}
+                    <li>
+                        <div class="user-card">
+                            <div class="user-info">
+                                <strong>{{ user.name }}</strong> (ID: {{ user.id }})
+                                <div class="user-details">
+                                    Registered: {{ user.registration_date }}
+                                    <br>
+                                    Last verification: {{ user.last_verification or 'Never' }}
+                                </div>
+                            </div>
+                            <div class="user-actions">
+                                <a href="{{ url_for('select_user', user_id=user.id) }}" class="btn btn-primary">Select</a>
+                                <a href="{{ url_for('start_verification', user_id=user.id) }}" class="btn btn-success">Verify</a>
+                                <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this user?')">Delete</a>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No registered users. Please register a new user.</p>
+                {% endif %}
+                
+                <div class="register-link">
+                    <a href="{{ url_for('register') }}" class="btn btn-success">Register New User</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="video-container">
+            <img id="video" src="{{ url_for('video_feed') }}" alt="Video Feed">
+        </div>
+        
+        <div class="status-container">
+            <div id="eye-status" class="status-indicator status-box no-face">
+                Eyes: Initializing...
+            </div>
+            <div id="head-status" class="status-indicator status-box no-face">
+                Head: Initializing...
+            </div>
+            <div id="audio-status" class="status-indicator status-box inactive">
+                Audio: Inactive
+            </div>
+        </div>
+        
+        <div class="tracking-tabs">
+            <div class="tab active" data-tab="eye-tracking">Eye Tracking</div>
+            <div class="tab" data-tab="head-tracking">Head Tracking</div>
+            <div class="tab" data-tab="verification">Face Verification</div>
+            <div class="tab" data-tab="audio-monitoring">Audio Monitoring</div>
+            <div class="tab" data-tab="object-detection">Object Detection</div>
+        </div>
+        
+        <div id="eye-tracking" class="tab-content active">
+            <div class="metrics-container">
+                <h2>Reading Metrics</h2>
+                
+                <div class="metric-title">Current Reading Session:</div>
+                <div class="reading-progress">
+                    <div id="continuous-reading-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="continuous-reading-text" class="progress-text">0.0s</div>
+                </div>
+                
+                <div class="metric-title">Total Reading Time:</div>
+                <div id="total-reading-time">0.0 seconds</div>
+                
+                <div class="metric-title">Reading Sessions:</div>
+                <div id="reading-sessions">0</div>
+                
+                <div class="metric-title">On-Screen Percentage:</div>
+                <div class="reading-progress">
+                    <div id="on-screen-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="on-screen-text" class="progress-text">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="head-tracking" class="tab-content">
+            <div class="metrics-container">
+                <h2>Head Position Metrics</h2>
+                
+                <div class="metric-title">Head Movement Count:</div>
+                <div id="head-movement-count">0</div>
+                
+                <div class="metric-title">Head Straight Time Percentage:</div>
+                <div class="reading-progress">
+                    <div id="head-straight-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="head-straight-text" class="progress-text">0%</div>
+                </div>
+                
+                <div class="metric-title">Current Head Direction:</div>
+                <div id="head-direction">Unknown</div>
+            </div>
+        </div>
+        
+        <div id="verification" class="tab-content">
+            <div class="metrics-container">
+                <h2>Face Verification Results</h2>
+                
+                <div class="metric-title">Status:</div>
+                <div id="face-verification-status">Not verified</div>
+                
+                <div class="metric-title">Confidence:</div>
+                <div class="reading-progress">
+                    <div id="verification-confidence-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="verification-confidence-text" class="progress-text">0%</div>
+                </div>
+                
+                <div class="metric-title">Verification Time Remaining:</div>
+                <div class="reading-progress">
+                    <div id="verification-time-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="verification-time-text" class="progress-text">0s remaining</div>
+                </div>
+                
+                <div class="metric-title">Max Confidence:</div>
+                <div id="max-verification-confidence">0%</div>
+                
+                <div class="metric-title">Verification Checks:</div>
+                <div id="verification-checks">0</div>
+                
+                <div class="metric-title">Last Verification:</div>
+                <div id="last-verification-time">Never</div>
+            </div>
+        </div>
+        
+        <div id="audio-monitoring" class="tab-content">
+            <div class="metrics-container">
+                <h2>Audio Monitoring</h2>
+                
+                <div class="headphones-status">
+                    <div class="metric-title">Headphones with Mic Status:</div>
+                    <div id="headphones-status" class="status-indicator not-verified">Not Detected</div>
+                    <button id="check-headphones-btn" class="btn btn-primary">Check Headphones</button>
+                    <button id="test-mic-btn" class="btn btn-primary">Test Microphone</button>
+                </div>
+                
+                <div class="audio-controls">
+                    <button id="start-audio-btn" class="btn btn-success">Start Audio Monitoring</button>
+                    <button id="stop-audio-btn" class="btn btn-danger">Stop Audio Monitoring</button>
+                </div>
+                
+                <div class="metric-title">Audio Monitoring Status:</div>
+                <div id="audio-monitoring-status" class="status-indicator not-verified">Inactive</div>
+                
+                <div class="metric-title">Words Detected:</div>
+                <div id="words-detected">0</div>
+                
+                <div class="metric-title">Sentences Detected:</div>
+                <div id="sentences-detected">0</div>
+                
+                <div class="metric-title">Last Spoken Text:</div>
+                <div id="last-spoken-text" class="speech-text">None</div>
+                
+                <div class="metric-title">Most Common Words:</div>
+                <div id="common-words" class="common-words">None</div>
+                
+                <div class="metric-title">Background Noise Level:</div>
+                <div class="reading-progress">
+                    <div id="noise-level-progress" class="progress-bar" style="width: 0%"></div>
+                    <div id="noise-level-text" class="progress-text">0</div>
+                </div>
+                
+                <div class="metric-title">Time Since Last Detection:</div>
+                <div id="time-since-detection">Never</div>
+                
+                <div class="save-spoken-content">
+                    <a href="{{ url_for('save_spoken_content') }}" class="btn btn-primary">Save Spoken Content</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Object Detection Tab - Missing in original HTML -->
+        <div id="object-detection" class="tab-content">
+            <div class="metrics-container">
+                <h2>Object Detection</h2>
+                
+                <div class="object-detection-controls">
+                    <button id="toggle-object-detection-btn" class="btn btn-primary">Toggle Object Detection</button>
+                    <button id="save-object-detections-btn" class="btn btn-success">Save Object Detections</button>
+                </div>
+                
+                <div class="metric-title">Object Detection Status:</div>
+                <div id="object-detection-status" class="status-indicator not-verified">Inactive</div>
+                
+                <div class="metric-title">Objects Detected:</div>
+                <div id="objects-detected">0</div>
+                
+                <div class="metric-title">Last Detection:</div>
+                <div id="last-object-detection">Never</div>
+                
+                <div class="metric-title">Detected Object Classes:</div>
+                <div id="object-classes-detected" class="common-words">None</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="calibrate-btn" class="btn btn-primary">Recalibrate</button>
+
+            <div class="metric-title">Recent Object Detections:</div>
+<div id="object-detections-list" class="recent-objects">Loading...</div>
+
+        </div>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for message in messages %}
+                <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+    
+<div id="tab-warning-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+     background-color: rgba(0,0,0,0.8); color:white; text-align:center; z-index:9999; padding-top:100px;">
+    <div style="background:#222; padding:20px 30px; border-radius:10px; display:inline-block;">
+        <h2 id="tab-warning-text"></h2>
+        <button id="close-warning-btn" style="margin-top:20px; padding:10px 20px;">OK</button>
+    </div>
+</div>
+
+<div class="report-generation">
+    <form action="/generate_report" method="get" style="margin-top: 20px;">
+        <label for="duration">Select Time Duration (minutes):</label>
+        <input type="number" id="duration" name="duration" min="1" max="120" required style="margin: 0 10px;">
+        <button type="submit" class="btn btn-primary">Generate PDF Report</button>
+    </form>
+</div>
+    <!-- Include JavaScript file -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
