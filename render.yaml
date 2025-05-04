@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: your-app-name # Replace with your application name
+    env: python
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app # Replace with your actual start command
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.9" # Adjust as needed for your project
+    buildFilter:
+      paths:
+        - requirements.txt
+    packages:
+      - cmake
+      - libx11-dev
+      - libatlas-base-dev
+      - libgtk-3-dev
+      - libboost-python-dev
