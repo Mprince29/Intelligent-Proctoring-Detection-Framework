@@ -1,12 +1,14 @@
 services:
   - type: web
-    name: your-app-name # Replace with your application name
+    name: your-app-name # Replace with your actual app name
     env: python
     buildCommand: chmod +x build.sh && ./build.sh
     startCommand: gunicorn app:app # Replace with your actual start command
     envVars:
       - key: PYTHON_VERSION
-        value: "3.9" # Adjust as needed for your project
+        value: "3.9" # Adjust to your Python version if needed
+      - key: PATH
+        value: /opt/render/project/python3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     buildFilter:
       paths:
         - requirements.txt
