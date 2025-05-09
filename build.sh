@@ -23,7 +23,7 @@ echo "Upgrading pip..."
 pip install --upgrade pip setuptools wheel
 
 echo "Installing dlib separately with specific compilation settings..."
-pip install --no-cache-dir dlib>=19.24.0,<19.25.0
+#pip install --no-cache-dir dlib>=19.24.0,<19.25.0
 
 echo "Installing remaining Python dependencies..."
 pip install --no-cache-dir -r requirements.txt
