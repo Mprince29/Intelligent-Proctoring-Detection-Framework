@@ -15,16 +15,22 @@ from head_detector import HeadDetector
 from faceverifier import FaceVerifier
 from audio_detector import AudioDetector
 from object_detector import ObjectDetector
+from pymongo import MongoClient
+from datetime import datetime
+from bson.objectid import ObjectId
+import re
 
 # Configure logging - write to file only with minimal output
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("eye_tracking.log"),
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("eye_tracker")
+logger.setLevel(logging.DEBUG)
 
 # Create a shared video capture for all trackers
 cap = None
@@ -53,15 +59,24 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Max 16MB upload
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png'}
 
-# Database path
-DB_PATH = 'face_database.db'
+# MongoDB configuration
+MONGODB_URI = "mongodb://localhost:27017/"
+DB_NAME = "face_verification"
 
+# Initialize MongoDB client
+try:
+    mongo_client = MongoClient(MONGODB_URI)
+    db = mongo_client[DB_NAME]
+    logger.info("MongoDB connection established successfully")
+except Exception as e:
+    logger.error(f"MongoDB connection error: {str(e)}")
+    raise
 
 # Initialize components after the camera is available
 if cap is not None and cap.isOpened():
     eye_tracker = EyeTracker(video_source=cap)
     head_detector = HeadDetector(video_source=cap)
-    face_verifier = FaceVerifier(db_path=DB_PATH, photos_dir=UPLOAD_FOLDER)
+    face_verifier = FaceVerifier(db_uri=MONGODB_URI, db_name=DB_NAME, photos_dir=UPLOAD_FOLDER)
     object_detector = ObjectDetector(video_source=cap, confidence_threshold=0.45)
 else:
     logger.error("Camera not available, components could not be initialized")
@@ -106,6 +121,11 @@ def eye_movement_detection_thread():
         logger.error("Cannot start detection thread - video capture or trackers not initialized")
         return
 
+    logger.info("Starting eye movement detection thread")
+    logger.info(f"Eye tracker initialized: {eye_tracker is not None}")
+    logger.info(f"Head detector initialized: {head_detector is not None}")
+    logger.info(f"Video capture opened: {cap is not None and cap.isOpened()}")
+
     process_every_n_frames = 2  # Process every other frame
     verify_every_n_frames = 5  # Verify face frequently in verification mode
     frame_counter = 0
@@ -114,6 +134,7 @@ def eye_movement_detection_thread():
     metrics_log_interval = 60  # Log metrics every 60 seconds
 
     eye_tracker.start_video_capture()
+    logger.info("Eye tracker video capture started")
 
     while True:
         try:
@@ -130,6 +151,15 @@ def eye_movement_detection_thread():
                 eye_frame = eye_tracker.process_frame()
                 head_frame = head_detector.process_frame(frame.copy())
 
+                # Log metrics more frequently for debugging
+                if frame_counter % 30 == 0:  # Every 30 frames
+                    if eye_tracker is not None:
+                        eye_metrics = eye_tracker.get_reading_metrics()
+                        logger.debug(f"Current reading metrics: {eye_metrics}")
+                    if head_detector is not None:
+                        head_metrics = head_detector.get_head_tracking_metrics()
+                        logger.debug(f"Current head metrics: {head_metrics}")
+
                 object_frame = None
                 if object_detector is not None and current_session['object_detection_active']:
                     object_frame = object_detector.process_frame(frame.copy())
@@ -142,12 +172,6 @@ def eye_movement_detection_thread():
                     if 'recent_detections' in metrics and metrics['recent_detections']:
                         most_recent = metrics['recent_detections'][-1]['object']
                         current_session['most_recent_object'] = most_recent
-
-                    if frame_counter % 15 == 0:
-                        metrics = object_detector.get_detection_metrics()
-                        current_session['objects_detected'] = metrics['total_objects_detected']
-                        if metrics['time_since_last_detection'] is not None:
-                            current_session['last_object_detection'] = time.time() - metrics['time_since_last_detection']
 
                 # Decide display frame priority
             
@@ -279,7 +303,7 @@ audio_monitor_thread.daemon = True
 audio_monitor_thread.start()
 
         
-@app.route('/start_verification/<int:user_id>')
+@app.route('/start_verification/<user_id>')
 def start_verification(user_id):
     """Route to start a dedicated verification process for a user"""
     # Reset the verification session
@@ -319,62 +343,112 @@ def generate():
 
 @app.route('/')
 def index():
-    """Route for home page"""
-    users = []
-    if face_verifier is not None:
-        users = face_verifier.get_all_users()
-    return render_template('index.html', users=users, current_user=current_session)
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    """Route for user registration with passport photo"""
-    if face_verifier is None:
-        flash('Face verification system is not available')
-        return redirect(url_for('index'))
+    """Main page route - Now checks if user is registered"""
+    # Check if there's a registered user in the session
+    if current_session.get('user_id') is None:
+        # No registered user, redirect to registration
+        return redirect(url_for('register_page'))
         
-    if request.method == 'POST':
-        # Check if the post request has the file part
-        if 'photo' not in request.files:
-            flash('No file part')
-            return redirect(request.url)
-            
-        file = request.files['photo']
-        name = request.form.get('name')
-        email = request.form.get('email')
-        
-        # If user doesn't select file, browser may submit an empty file
-        if file.filename == '':
-            flash('No selected file')
-            return redirect(request.url)
-            
-        if not name:
-            flash('Name is required')
-            return redirect(request.url)
-            
-        if file and allowed_file(file.filename):
-            # Save the file
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            # Read the image for face registration
-            img = cv2.imread(filepath)
-            
-            # Register the user
-            success, result = face_verifier.register_user(name, img)
-            
-            if success:
-                flash(f'User registered successfully with ID: {result}')
-                return redirect(url_for('index'))
-            else:
-                # Remove the file if registration failed
-                os.remove(filepath)
-                flash(f'Registration failed: {result}')
-                return redirect(request.url)
+    try:
+        users = face_verifier.get_all_users() if face_verifier else []
+        formatted_users = []
+        for user in users:
+            try:
+                formatted_users.append({
+                    'id': user['id'],
+                    'name': user.get('name', 'Unknown'),
+                    'registration_date': user.get('registration_date', 'Unknown'),
+                    'last_verification': user.get('last_verification', 'Never')
+                })
+            except Exception as e:
+                logger.error(f"Error formatting user data: {str(e)}")
+                continue
                 
+        return render_template('index.html', users=formatted_users, current_user=current_session)
+    except Exception as e:
+        logger.error(f"Error in index route: {str(e)}")
+        flash('An error occurred while loading the page')
+        return render_template('index.html', users=[], current_user=current_session)
+
+@app.route('/register', methods=['GET'])
+def register_page():
+    """Show the registration page"""
+    # If user is already registered and verified, redirect to index
+    if current_session.get('user_id') is not None and current_session.get('is_verified', False):
+        return redirect(url_for('index'))
     return render_template('register.html')
 
-@app.route('/select_user/<int:user_id>')
+@app.route('/register', methods=['POST'])
+def register():
+    """Handle registration form submission"""
+    try:
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        student_id = request.form.get('student_id')
+        photo = request.files.get('photo')
+        
+        if not all([name, email, phone, student_id, photo]):
+            flash('All fields are required')
+            return redirect(url_for('register_page'))
+            
+        # Validate student ID (numbers only)
+        if not student_id.isdigit():
+            flash('Student ID must contain only numbers')
+            return redirect(url_for('register_page'))
+            
+        # Check if student ID already exists
+        existing_user = db.users.find_one({"student_id": student_id})
+        if existing_user:
+            flash('This Student ID is already registered')
+            return redirect(url_for('register_page'))
+            
+        # Process and save photo
+        if photo and allowed_file(photo.filename):
+            # Create a secure filename with student ID
+            filename = f"student_{student_id}_{secure_filename(photo.filename)}"
+            photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            photo.save(photo_path)
+            
+            # Register user with face verifier
+            user_id = face_verifier.register_user(name, email, phone, photo_path)
+            
+            if user_id:
+                # Update user document with student ID
+                db.users.update_one(
+                    {"_id": ObjectId(user_id)},
+                    {"$set": {"student_id": student_id}}
+                )
+                
+                # Set the current session
+                current_session['user_id'] = user_id
+                current_session['verification_status'] = None
+                current_session['verification_confidence'] = 0.0
+                current_session['is_verified'] = False
+                current_session['verification_mode'] = True
+                current_session['verification_start_time'] = time.time()
+                current_session['verification_complete'] = False
+                current_session['max_confidence'] = 0.0
+                
+                flash('Registration successful! Please complete face verification.')
+                # Start verification process
+                return redirect(url_for('start_verification', user_id=user_id))
+            else:
+                # Clean up photo if registration failed
+                if os.path.exists(photo_path):
+                    os.remove(photo_path)
+                flash('Failed to register user. Please try again.')
+                return redirect(url_for('register_page'))
+        else:
+            flash('Invalid photo format. Please use PNG, JPG or JPEG')
+            return redirect(url_for('register_page'))
+            
+    except Exception as e:
+        logger.error(f"Error during registration: {str(e)}")
+        flash('An error occurred during registration')
+        return redirect(url_for('register_page'))
+
+@app.route('/select_user/<user_id>')
 def select_user(user_id):
     """Route to select a user for verification"""
     # Reset the session
@@ -413,16 +487,18 @@ def get_status():
         head_status = "No data"
 
         eye_metrics = {
-            "total_reading_time": 0.0,
-            "reading_sessions": 0,
-            "continuous_reading_time": 0.0,
-            "on_screen_percentage": 0.0
+            "blink_rate": 0.0,
+            "gaze_confidence": 0.0,
+            "gaze_direction": "unknown",
+            "last_blink_time": None
         }
 
         head_metrics = {
             "head_direction": "unknown",
             "head_movement_count": 0,
-            "straight_time_percentage": 0.0
+            "straight_time_percentage": 0.0,
+            "movement_intensity": 0.0,
+            "last_movement_time": None
         }
 
         audio_metrics = {
@@ -442,6 +518,16 @@ def get_status():
             try:
                 gaze_status = eye_tracker.get_current_gaze_status()
                 eye_metrics = eye_tracker.get_reading_metrics() or eye_metrics
+                
+                # Extract blink rate and other metrics
+                eye_metrics["blink_rate"] = eye_tracker.blink_rate
+                eye_metrics["last_blink_time"] = eye_tracker.last_blink_time
+                
+                # Extract confidence from gaze status if available
+                confidence_match = re.search(r'\((\d+)%', gaze_status)
+                if confidence_match:
+                    eye_metrics["gaze_confidence"] = float(confidence_match.group(1))
+                
             except Exception as e:
                 logger.error(f"Error getting eye tracking metrics: {e}")
 
@@ -450,6 +536,13 @@ def get_status():
             try:
                 head_status = head_detector.get_current_head_status()
                 head_metrics = head_detector.get_head_tracking_metrics() or head_metrics
+                
+                # Calculate movement intensity
+                if head_metrics["head_direction"] != "head_straight":
+                    head_metrics["movement_intensity"] = min(100, (1 - head_metrics["straight_time_percentage"] / 100) * 200)
+                else:
+                    head_metrics["movement_intensity"] = 0.0
+                    
             except Exception as e:
                 logger.error(f"Error getting head tracking metrics: {e}")
 
@@ -519,13 +612,14 @@ def get_status():
             "gaze_status": gaze_status,
             "head_status": head_status,
             "status_class": status_class,
-            "total_reading_time": eye_metrics.get("total_reading_time", 0.0),
-            "reading_sessions": eye_metrics.get("reading_sessions", 0),
-            "continuous_reading_time": eye_metrics.get("continuous_reading_time", 0.0),
-            "on_screen_percentage": eye_metrics.get("on_screen_percentage", 0.0),
-            "head_direction": head_metrics.get("head_direction", "unknown"),
-            "head_movement_count": head_metrics.get("head_movement_count", 0),
-            "straight_time_percentage": head_metrics.get("straight_time_percentage", 0.0),
+            "blink_rate": eye_metrics["blink_rate"],
+            "gaze_confidence": eye_metrics["gaze_confidence"],
+            "last_blink_time": eye_metrics["last_blink_time"],
+            "head_direction": head_metrics["head_direction"],
+            "head_movement_count": head_metrics["head_movement_count"],
+            "straight_time_percentage": head_metrics["straight_time_percentage"],
+            "movement_intensity": head_metrics["movement_intensity"],
+            "last_movement_time": head_metrics["last_movement_time"],
             "verification": verification_info,
             "audio": audio_status,
             "object_detection": object_info
@@ -560,7 +654,7 @@ def get_verification_metrics():
         return jsonify({"error": "Face verifier not available"}), 404
     return jsonify(face_verifier.get_verification_metrics() or {})
 
-@app.route('/delete_user/<int:user_id>')
+@app.route('/delete_user/<user_id>')
 def delete_user(user_id):
     """Route to delete a user"""
     if face_verifier is None:
@@ -798,4 +892,4 @@ if __name__ == '__main__':
     
     logger.info("Eye and head tracking system started")
     # Run the Flask app
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=False)

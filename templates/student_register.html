@@ -5,6 +5,38 @@
     <meta charset="UTF-8">
     <title>Student Exam Registration</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        function validateForm() {
+            var email = document.forms["registrationForm"]["email"].value;
+            var phone = document.forms["registrationForm"]["phone"].value;
+            var photo = document.forms["registrationForm"]["photo"].value;
+
+            // Email validation
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert("Please enter a valid email address");
+                return false;
+            }
+
+            // Phone validation
+            var phoneRegex = /^\d{10}$/;
+            if (!phoneRegex.test(phone)) {
+                alert("Please enter a valid 10-digit phone number");
+                return false;
+            }
+
+            // Photo validation
+            if (photo) {
+                var allowedExtensions = /(\.jpg|\.jpeg|\.png)$/i;
+                if (!allowedExtensions.exec(photo)) {
+                    alert("Please upload a valid image file (jpg, jpeg, or png)");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    </script>
 </head>
 <body>
     <div class="container">
@@ -20,26 +52,27 @@
         {% endif %}
         {% endwith %}
 
-        <form method="POST" enctype="multipart/form-data">
+        <form name="registrationForm" method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
             <label for="application_number">Application Number:</label>
-            <input type="text" name="application_number" required><br>
+            <input type="text" name="application_number" pattern="[A-Za-z0-9]+" title="Only letters and numbers allowed" required><br>
 
             <label for="full_name">Full Name:</label>
-            <input type="text" name="full_name" required><br>
+            <input type="text" name="full_name" pattern="[A-Za-z\s]+" title="Only letters and spaces allowed" required><br>
 
             <label for="email">Email Address:</label>
             <input type="email" name="email" required><br>
 
             <label for="phone">Phone Number:</label>
-            <input type="text" name="phone" required><br>
+            <input type="tel" name="phone" pattern="\d{10}" title="Please enter a 10-digit phone number" required><br>
 
             <label for="photo">Passport Photo:</label>
             <input type="file" name="photo" accept="image/*" required><br>
+            <small>Accepted formats: JPG, JPEG, PNG. Max size: 16MB</small><br>
 
             <button type="submit" class="btn btn-success">Register</button>
         </form>
 
-        <p><a href="/">Back to Home</a></p>
+        <p><a href="/" class="btn btn-link">Back to Home</a></p>
     </div>
 </body>
 </html>

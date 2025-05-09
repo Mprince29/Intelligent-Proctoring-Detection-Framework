@@ -191,6 +191,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }, 5000);
     }
+
+    // Initialize tab switching
+    initializeTabSwitching();
 });
 
 // Function to start verification for a specific user
@@ -245,6 +248,33 @@ function updateStatus() {
                 eyeStatusElement.className = 'status-indicator status-box ' + (data.status_class || 'no-face');
             }
 
+            // Detailed eye tracking metrics
+            if (document.getElementById('current-gaze')) {
+                document.getElementById('current-gaze').innerText = data.gaze_status || 'Unknown';
+            }
+
+            if (document.getElementById('detailed-eye-status')) {
+                document.getElementById('detailed-eye-status').innerText = data.gaze_status || 'Not detected';
+                document.getElementById('detailed-eye-status').className = 'status-box ' + (data.status_class || 'no-face');
+            }
+
+            // Extract confidence from gaze status (e.g., "Looking at Screen (85% confidence)")
+            const confidenceMatch = (data.gaze_status || '').match(/\((\d+)%/);
+            const gazeConfidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 0;
+            
+            if (document.getElementById('gaze-confidence-progress')) {
+                document.getElementById('gaze-confidence-progress').style.width = gazeConfidence + '%';
+            }
+            
+            if (document.getElementById('gaze-confidence-text')) {
+                document.getElementById('gaze-confidence-text').innerText = gazeConfidence + '%';
+            }
+
+            if (document.getElementById('blink-rate')) {
+                document.getElementById('blink-rate').innerText = 
+                    (data.blink_rate || 0).toFixed(1) + ' blinks/min';
+            }
+
             // ==== HEAD STATUS ====
             const headStatusElement = document.getElementById('head-status');
             if (headStatusElement) {
@@ -253,18 +283,92 @@ function updateStatus() {
                 headStatusElement.className = 'status-indicator status-box ' + headClass;
             }
 
+            // Update head position
+            if (document.getElementById('head-position')) {
+                document.getElementById('head-position').innerText = 
+                    formatHeadDirection(data.head_direction || 'unknown');
+            }
+
+            // Update head movement count
+            if (document.getElementById('head-movement-count')) {
+                document.getElementById('head-movement-count').innerText = 
+                    data.head_movement_count || 0;
+            }
+
+            if (document.getElementById('total-head-movements')) {
+                document.getElementById('total-head-movements').innerText = 
+                    data.head_movement_count || 0;
+            }
+
+            // Update head straight time percentage
+            const straightPercentage = data.straight_time_percentage || 0;
+            if (document.getElementById('head-straight-progress')) {
+                document.getElementById('head-straight-progress').style.width = straightPercentage + '%';
+            }
+            
+            if (document.getElementById('head-straight-text')) {
+                document.getElementById('head-straight-text').innerText = straightPercentage.toFixed(1) + '%';
+            }
+
+            // Update head movement status
+            if (document.getElementById('head-movement-status')) {
+                const status = data.head_direction === 'head_straight' ? 'Stable' : 'Moving';
+                document.getElementById('head-movement-status').innerText = status;
+                document.getElementById('head-movement-status').className = 
+                    'status-box ' + (data.head_direction === 'head_straight' ? 'head-straight' : 'head-moved');
+            }
+
+            // Update head direction in detailed view
+            if (document.getElementById('head-direction')) {
+                document.getElementById('head-direction').innerText =
+                    formatHeadDirection(data.head_direction || 'unknown');
+            }
+
+            // Update movement intensity (based on how far from straight position)
+            const movementIntensity = data.head_direction === 'head_straight' ? 0 : 
+                Math.min(100, (1 - (data.straight_time_percentage || 0) / 100) * 200);
+            
+            if (document.getElementById('head-movement-intensity-progress')) {
+                document.getElementById('head-movement-intensity-progress').style.width = movementIntensity + '%';
+            }
+            
+            if (document.getElementById('head-movement-intensity-text')) {
+                document.getElementById('head-movement-intensity-text').innerText = movementIntensity.toFixed(1) + '%';
+            }
+
+            // Update head position history
+            if (document.getElementById('head-position-history')) {
+                const historyElement = document.getElementById('head-position-history');
+                if (data.head_direction && data.head_direction !== 'unknown') {
+                    const timestamp = new Date().toLocaleTimeString();
+                    const newEntry = document.createElement('div');
+                    newEntry.className = 'history-entry';
+                    newEntry.innerHTML = `${timestamp}: ${formatHeadDirection(data.head_direction)}`;
+                    
+                    // Keep only last 5 entries
+                    while (historyElement.childNodes.length >= 5) {
+                        historyElement.removeChild(historyElement.firstChild);
+                    }
+                    historyElement.appendChild(newEntry);
+                } else if (historyElement.innerText === 'No movements recorded') {
+                    // Keep the default text if no movements
+                    historyElement.innerText = 'No movements recorded';
+                }
+            }
+
             // ==== EYE TRACKING METRICS ====
             if (document.getElementById('total-reading-time')) {
+                const totalReadingTime = parseFloat(data.total_reading_time || 0);
                 document.getElementById('total-reading-time').innerText =
-                    (data.total_reading_time !== undefined ? data.total_reading_time.toFixed(1) : '0.0') + ' seconds';
+                    totalReadingTime.toFixed(1) + ' seconds';
             }
             
             if (document.getElementById('reading-sessions')) {
                 document.getElementById('reading-sessions').innerText =
-                    data.reading_sessions !== undefined ? data.reading_sessions : '0';
+                    parseInt(data.reading_sessions || 0);
             }
 
-            const continuousReading = data.continuous_reading_time || 0;
+            const continuousReading = parseFloat(data.continuous_reading_time || 0);
             const continuousProgress = Math.min((continuousReading / 30) * 100, 100);
             if (document.getElementById('continuous-reading-progress')) {
                 document.getElementById('continuous-reading-progress').style.width = continuousProgress + '%';
@@ -274,32 +378,13 @@ function updateStatus() {
                 document.getElementById('continuous-reading-text').innerText = continuousReading.toFixed(1) + 's';
             }
 
-            const onScreenPercentage = data.on_screen_percentage || 0;
+            const onScreenPercentage = parseFloat(data.on_screen_percentage || 0);
             if (document.getElementById('on-screen-progress')) {
                 document.getElementById('on-screen-progress').style.width = onScreenPercentage + '%';
             }
             
             if (document.getElementById('on-screen-text')) {
                 document.getElementById('on-screen-text').innerText = onScreenPercentage.toFixed(1) + '%';
-            }
-
-            // ==== HEAD TRACKING ====
-            if (document.getElementById('head-movement-count')) {
-                document.getElementById('head-movement-count').innerText = data.head_movement_count || '0';
-            }
-            
-            if (document.getElementById('head-direction')) {
-                document.getElementById('head-direction').innerText =
-                    data.head_direction ? formatHeadDirection(data.head_direction) : 'Unknown';
-            }
-
-            const straightPercentage = data.straight_time_percentage || 0;
-            if (document.getElementById('head-straight-progress')) {
-                document.getElementById('head-straight-progress').style.width = straightPercentage + '%';
-            }
-            
-            if (document.getElementById('head-straight-text')) {
-                document.getElementById('head-straight-text').innerText = straightPercentage.toFixed(1) + '%';
             }
 
             // ==== FACE VERIFICATION ====
@@ -968,4 +1053,23 @@ function showTabWarning(message, shouldEndExam = false) {
             endExam();
         }
     };
+}
+
+// Tab switching functionality
+function initializeTabSwitching() {
+    const tabs = document.querySelectorAll('.tab');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs and contents
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add('active');
+            const contentId = tab.getAttribute('data-tab');
+            document.getElementById(contentId).classList.add('active');
+        });
+    });
 }

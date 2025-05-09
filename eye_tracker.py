@@ -69,7 +69,7 @@ class EyeTracker:
         self.lock = threading.Lock()
         self.frame_count = 0
         
-        # Reading tracking variables
+        # Initialize reading tracking variables with better defaults
         self.on_screen_start_time = None
         self.reading_time = 0
         self.continuous_reading_threshold = 2.0  # seconds
@@ -78,10 +78,10 @@ class EyeTracker:
         self.total_reading_time = 0
         self.last_status_change_time = time.time()
         self.reading_stats = {
-            "continuous_reading_time": 0,
+            "continuous_reading_time": 0.0,
             "reading_sessions": 0,
-            "total_reading_time": 0,
-            "on_screen_percentage": 0,
+            "total_reading_time": 0.0,
+            "on_screen_percentage": 0.0,
             "tracking_start_time": time.time()
         }
         self.blink_count = 0
@@ -259,10 +259,10 @@ class EyeTracker:
         self.on_screen_start_time = None
         self.reading_time = 0
         self.reading_stats = {
-            "continuous_reading_time": 0,
+            "continuous_reading_time": 0.0,
             "reading_sessions": 0,
-            "total_reading_time": 0,
-            "on_screen_percentage": 0,
+            "total_reading_time": 0.0,
+            "on_screen_percentage": 0.0,
             "tracking_start_time": time.time()
         }
     
@@ -277,14 +277,12 @@ class EyeTracker:
                 # Just started looking at the screen
                 self.on_screen_start_time = current_time
             
-            # Check if we've been looking at the screen continuously for the threshold time
+            # Check if we've been looking at the screen continuously
             continuous_time = current_time - self.on_screen_start_time
             
-            # Update the longest continuous reading session
-            self.reading_stats["continuous_reading_time"] = max(
-                self.reading_stats["continuous_reading_time"], 
-                continuous_time
-            )
+            # Update continuous reading time if it's longer than current max
+            if continuous_time > self.reading_stats["continuous_reading_time"]:
+                self.reading_stats["continuous_reading_time"] = continuous_time
             
             # If we weren't reading before but now have been on screen for threshold time
             if not self.is_currently_reading and continuous_time >= self.continuous_reading_threshold:
@@ -296,14 +294,21 @@ class EyeTracker:
                 self.reading_stats["total_reading_time"] += elapsed
         else:
             # No longer looking at screen
+            if self.on_screen_start_time is not None:
+                # Calculate final continuous time for this session
+                final_continuous_time = current_time - self.on_screen_start_time
+                if final_continuous_time > self.reading_stats["continuous_reading_time"]:
+                    self.reading_stats["continuous_reading_time"] = final_continuous_time
+            
             self.on_screen_start_time = None
             self.is_currently_reading = False
         
         # Calculate on-screen percentage
         total_tracking_time = current_time - self.reading_stats["tracking_start_time"]
         if total_tracking_time > 0:
-            self.reading_stats["on_screen_percentage"] = (
-                self.reading_stats["total_reading_time"] / total_tracking_time * 100
+            self.reading_stats["on_screen_percentage"] = min(
+                100.0,
+                (self.reading_stats["total_reading_time"] / total_tracking_time) * 100.0
             )
         
         # Update blink metrics if this is a blink
@@ -314,6 +319,12 @@ class EyeTracker:
                 self.blink_rate = self.blink_count / elapsed_minutes
         
         self.last_status_change_time = current_time
+        
+        # Ensure all metrics are properly formatted
+        self.reading_stats["total_reading_time"] = float(self.reading_stats["total_reading_time"])
+        self.reading_stats["continuous_reading_time"] = float(self.reading_stats["continuous_reading_time"])
+        self.reading_stats["on_screen_percentage"] = float(self.reading_stats["on_screen_percentage"])
+        self.reading_stats["reading_sessions"] = int(self.reading_stats["reading_sessions"])
     
     def process_frame(self):
         """Process a single frame with performance optimization"""
