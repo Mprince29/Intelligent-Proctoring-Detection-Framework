@@ -24,8 +24,6 @@ A real-time AI powered invigilation system built with Flask, OpenCV, and multipl
 Frontend (HTML + Flask templates)
         
 Flask Server (app.py)
-
-        |
         
         +--> EyeTracker (eye_tracker.py)
         
@@ -65,11 +63,12 @@ MongoDB (Logging events, timestamps, violations)
 
 
 ⚙️ How It Works
+
 	1.	Launch Flask App:
 
  python app.py
 
- Visit http://localhost:5000 in your browser.
+ Visit http://localhost:5001 in your browser.
 
 	2.	Upload User Data:
 	•	Provide student name, ID, and a reference face image before starting the exam.
@@ -83,15 +82,22 @@ MongoDB (Logging events, timestamps, violations)
 
 
 🧪 Example Use Case
+
 	1.	Student logs in → Uploads ID & face image.
+ 
 	2.	Invigilator starts session → Models monitor for cheating.
+ 
 	3.	Student looks away/talks → Event is logged.
+ 
 	4.	Session ends → Invigilator downloads detailed report.
 
 
 📦 Installation
+
 # Clone repository
+
 git clone https://github.com/Mprince29/Intelligent-Proctoring-Detection-Framework.git
+
 cd Intelligent-Proctoring-Detection-Framework
 
 # Install dependencies
